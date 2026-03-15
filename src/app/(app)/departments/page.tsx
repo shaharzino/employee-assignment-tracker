@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Plus, Pencil, Power } from 'lucide-react'
+import { Plus, Pencil, Power, Trash2 } from 'lucide-react'
 import { type Department, DEPT_COLOR_PALETTE } from '@/types'
 
 const PRESET_COLORS = DEPT_COLOR_PALETTE
@@ -75,6 +75,35 @@ export default function DepartmentsPage() {
     load()
   }
 
+  async function handleDelete(dept: Department) {
+    const count = empCounts[dept.id] ?? 0
+    const confirmMsg = count > 0
+      ? `למחלקה "${dept.name}" יש ${count} עובדים פעילים. מחיקה תסיר את שיוך מחלקת הבית שלהם ותמחק את כל הנוכחות של המחלקה. האם להמשיך?`
+      : `האם למחוק את המחלקה "${dept.name}"? פעולה זו בלתי הפיכה.`
+    if (!window.confirm(confirmMsg)) return
+
+    // Remove home_dept_id from employees whose home dept is this department
+    const { error: empErr } = await supabase
+      .from('employees')
+      .update({ home_dept_id: null })
+      .eq('home_dept_id', dept.id)
+    if (empErr) { toast.error('שגיאה בעדכון עובדים: ' + empErr.message); return }
+
+    // Delete daily assignments for this department
+    const { error: assignErr } = await supabase
+      .from('daily_assignments')
+      .delete()
+      .eq('dept_id', dept.id)
+    if (assignErr) { toast.error('שגיאה במחיקת שיוכים: ' + assignErr.message); return }
+
+    // Delete the department
+    const { error: deptErr } = await supabase.from('departments').delete().eq('id', dept.id)
+    if (deptErr) { toast.error('שגיאה במחיקת מחלקה: ' + deptErr.message); return }
+
+    toast.success(`המחלקה "${dept.name}" נמחקה`)
+    load()
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -105,6 +134,9 @@ export default function DepartmentsPage() {
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => toggleActive(dept)}>
                   <Power className={`h-4 w-4 ${dept.is_active ? 'text-green-600' : 'text-muted-foreground'}`} />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => handleDelete(dept)} className="text-destructive hover:text-destructive">
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </CardContent>

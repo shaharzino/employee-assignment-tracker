@@ -41,14 +41,19 @@ export default function UsersPage() {
     setSaving(true)
 
     try {
+      // getUser() ensures the session token is fresh (auto-refreshes if needed)
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      if (!currentUser) throw new Error('יש להתחבר מחדש')
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('יש להתחבר מחדש')
+
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-manager`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             email: form.email.trim(),
@@ -58,7 +63,7 @@ export default function UsersPage() {
         }
       )
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'שגיאה לא ידועה')
+      if (!res.ok) throw new Error(json.error ?? json.msg ?? json.message ?? `שגיאה (${res.status})`)
 
       toast.success('המנהל נוסף בהצלחה')
       setShowModal(false)
