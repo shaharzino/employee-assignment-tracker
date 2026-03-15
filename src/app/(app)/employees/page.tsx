@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Pencil, ToggleLeft, ToggleRight, Search } from 'lucide-react'
+import { Plus, Pencil, ToggleLeft, ToggleRight, Search, Trash2, Upload } from 'lucide-react'
 import type { Employee, Department } from '@/types'
 
 export default function EmployeesPage() {
@@ -18,20 +18,21 @@ export default function EmployeesPage() {
   const [filterDept, setFilterDept] = useState('all')
   const [filterStatus, setFilterStatus] = useState('active')
   const [loading, setLoading] = useState(true)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function load() {
-      const [{ data: emps }, { data: depts }] = await Promise.all([
-        supabase.from('employees').select(`*, home_dept:departments!home_dept_id(*)`).order('full_name'),
-        supabase.from('departments').select('*').eq('is_active', true).order('name'),
-      ])
-      setEmployees((emps as unknown as Employee[]) ?? [])
-      setDepartments(depts ?? [])
-      setLoading(false)
-    }
-    load()
+  const load = useCallback(async () => {
+    const [{ data: emps }, { data: depts }] = await Promise.all([
+      supabase.from('employees').select(`*, home_dept:departments!home_dept_id(*)`).order('full_name'),
+      supabase.from('departments').select('*').eq('is_active', true).order('name'),
+    ])
+    setEmployees((emps as unknown as Employee[]) ?? [])
+    setDepartments(depts ?? [])
+    setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { load() }, [load])
 
   async function toggleActive(emp: Employee) {
     const { error } = await supabase
@@ -44,6 +45,30 @@ export default function EmployeesPage() {
     toast.success(emp.is_active ? 'עובד הושבת' : 'עובד הופעל')
   }
 
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return
+    if (!window.confirm(`האם למחוק ${selectedIds.size} עובדים? פעולה זו בלתי הפיכה.`)) return
+    setDeleting(true)
+    const { error } = await supabase.from('employees').delete().in('id', [...selectedIds])
+    if (error) {
+      toast.error('שגיאה במחיקה: ' + error.message)
+    } else {
+      const count = selectedIds.size
+      setEmployees((prev) => prev.filter((e) => !selectedIds.has(e.id)))
+      setSelectedIds(new Set())
+      toast.success(`נמחקו ${count} עובדים בהצלחה`)
+    }
+    setDeleting(false)
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const filtered = employees.filter((e) => {
     const matchSearch = !search || e.full_name.includes(search) || (e.employee_number ?? '').includes(search)
     const matchDept = filterDept === 'all' || e.home_dept_id === filterDept
@@ -51,14 +76,42 @@ export default function EmployeesPage() {
     return matchSearch && matchDept && matchStatus
   })
 
+  const allFilteredSelected = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id))
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((e) => n.delete(e.id)); return n })
+    } else {
+      setSelectedIds((prev) => { const n = new Set(prev); filtered.forEach((e) => n.add(e.id)); return n })
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">עובדים</h1>
-        <Link href="/employees/new" className={buttonVariants({ className: 'gap-2' })}>
-          <Plus className="h-4 w-4" />
-          הוסף עובד
-        </Link>
+        <div className="flex items-center gap-2 flex-wrap">
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={deleting}
+              className="gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? 'מוחק...' : `מחק נבחרים (${selectedIds.size})`}
+            </Button>
+          )}
+          <Link href="/employees/import" className={buttonVariants({ variant: 'outline', size: 'sm', className: 'gap-2' })}>
+            <Upload className="h-4 w-4" />
+            ייבא מ-Excel
+          </Link>
+          <Link href="/employees/new" className={buttonVariants({ size: 'sm', className: 'gap-2' })}>
+            <Plus className="h-4 w-4" />
+            הוסף עובד
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -95,7 +148,10 @@ export default function EmployeesPage() {
         </Select>
       </div>
 
-      <div className="text-sm text-muted-foreground">{filtered.length} עובדים</div>
+      <div className="text-sm text-muted-foreground">
+        {filtered.length} עובדים
+        {selectedIds.size > 0 && <span className="text-primary font-medium"> — {selectedIds.size} נבחרו</span>}
+      </div>
 
       {/* Table */}
       {loading ? (
@@ -105,6 +161,15 @@ export default function EmployeesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50">
+                <th className="px-3 py-3 text-start">
+                  <input
+                    type="checkbox"
+                    checked={allFilteredSelected}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 cursor-pointer accent-primary"
+                    title="בחר הכל"
+                  />
+                </th>
                 <th className="px-4 py-3 text-start font-medium text-muted-foreground">מספר</th>
                 <th className="px-4 py-3 text-start font-medium text-muted-foreground">שם</th>
                 <th className="px-4 py-3 text-start font-medium text-muted-foreground">מחלקת בית</th>
@@ -115,7 +180,18 @@ export default function EmployeesPage() {
             </thead>
             <tbody>
               {filtered.map((emp) => (
-                <tr key={emp.id} className="border-b hover:bg-muted/30 transition-colors">
+                <tr
+                  key={emp.id}
+                  className={`border-b transition-colors hover:bg-muted/30 ${selectedIds.has(emp.id) ? 'bg-primary/5' : ''}`}
+                >
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(emp.id)}
+                      onChange={() => toggleSelect(emp.id)}
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </td>
                   <td className="px-4 py-3 text-muted-foreground">{emp.employee_number ?? '—'}</td>
                   <td className="px-4 py-3 font-medium">{emp.full_name}</td>
                   <td className="px-4 py-3">
@@ -151,7 +227,7 @@ export default function EmployeesPage() {
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">לא נמצאו עובדים</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">לא נמצאו עובדים</td></tr>
               )}
             </tbody>
           </table>

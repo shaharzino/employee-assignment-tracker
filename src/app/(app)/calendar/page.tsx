@@ -28,6 +28,7 @@ export default function CalendarPage() {
   const [dayStatuses, setDayStatuses] = useState<Map<string, DayStatus>>(new Map())
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string>('')
+  const [filterDept, setFilterDept] = useState('all')
 
   // Get auth user
   useEffect(() => {
@@ -202,6 +203,30 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* Department filter tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1 flex-wrap">
+        <button
+          onClick={() => setFilterDept('all')}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+            filterDept === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          הכל
+        </button>
+        {departments.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => setFilterDept(d.id)}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors whitespace-nowrap ${
+              filterDept === d.id ? 'text-white' : 'bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+            style={filterDept === d.id ? { backgroundColor: d.color_hex } : {}}
+          >
+            {d.name}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="py-16 text-center text-muted-foreground">טוען לוח שנה...</div>
       ) : (
@@ -241,7 +266,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Employee rows */}
-            {employees.map(emp => {
+            {employees.filter(emp => filterDept === 'all' || emp.home_dept_id === filterDept).map(emp => {
               const pieData = getEmployeePieData(emp)
               const empAllowed = emp.work_days === 'sun_fri'
                 ? new Set([0, 1, 2, 3, 4, 5])

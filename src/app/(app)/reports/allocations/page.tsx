@@ -92,6 +92,8 @@ export default function AllocationsReportPage() {
             <Link href="/reports/quarterly" className="hover:text-foreground">רבעוני</Link>
             <span>|</span>
             <span className="text-foreground font-medium">הקצאות</span>
+            <span>|</span>
+            <Link href="/reports/dept" className="hover:text-foreground">מחלקתי</Link>
           </nav>
           <div className="flex gap-1">
             {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (

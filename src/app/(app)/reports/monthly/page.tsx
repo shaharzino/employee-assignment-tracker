@@ -27,14 +27,25 @@ export default function MonthlyReportPage() {
   const [balances, setBalances] = useState<DeptBalance[]>([])
   const [crossRows, setCrossRows] = useState<CrossAssignmentRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterEmp, setFilterEmp] = useState('all')
+  const [filterDept, setFilterDept] = useState('all')
 
   useEffect(() => {
     setLoading(true)
+    setFilterEmp('all')
+    setFilterDept('all')
     const { start, end } = getMonthRange(month)
     Promise.all([fetchDeptBalances(start, end), fetchCrossAssignments(start, end)])
       .then(([b, c]) => { setBalances(b); setCrossRows(c) })
       .finally(() => setLoading(false))
   }, [month])
+
+  const uniqueEmps = [...new Map(crossRows.map((r) => [r.employee_name, r.employee_name])).entries()].map(([k]) => k).sort()
+  const uniqueDepts = [...new Map(crossRows.map((r) => [r.worked_dept_name, { name: r.worked_dept_name, color: r.worked_dept_color }])).entries()].map(([, v]) => v)
+  const filteredRows = crossRows.filter((r) =>
+    (filterEmp === 'all' || r.employee_name === filterEmp) &&
+    (filterDept === 'all' || r.worked_dept_name === filterDept)
+  )
 
   const monthLabel = format(new Date(month + '-01T12:00:00'), 'MMMM yyyy', { locale: he })
   const totalCross = crossRows.length
@@ -57,6 +68,8 @@ export default function MonthlyReportPage() {
             <Link href="/reports/quarterly" className="hover:text-foreground">רבעוני</Link>
             <span>|</span>
             <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
+            <span>|</span>
+            <Link href="/reports/dept" className="hover:text-foreground">מחלקתי</Link>
           </nav>
           <input
             type="month"
@@ -144,7 +157,27 @@ export default function MonthlyReportPage() {
           {crossRows.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">פירוט שיוכים צולבים</CardTitle>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <CardTitle className="text-base">פירוט שיוכים צולבים</CardTitle>
+                  <div className="flex gap-2 flex-wrap">
+                    <select
+                      value={filterEmp}
+                      onChange={(e) => setFilterEmp(e.target.value)}
+                      className="rounded-md border px-2 py-1 text-xs"
+                    >
+                      <option value="all">כל העובדים</option>
+                      {uniqueEmps.map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <select
+                      value={filterDept}
+                      onChange={(e) => setFilterDept(e.target.value)}
+                      className="rounded-md border px-2 py-1 text-xs"
+                    >
+                      <option value="all">כל המחלקות</option>
+                      {uniqueDepts.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                    </select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -160,7 +193,7 @@ export default function MonthlyReportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {crossRows.map((row, i) => (
+                      {filteredRows.map((row, i) => (
                         <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
                           <td className="px-4 py-2 font-medium">{row.employee_name}</td>
                           <td className="px-4 py-2 text-muted-foreground text-xs">{row.employee_number ?? '—'}</td>
@@ -183,6 +216,9 @@ export default function MonthlyReportPage() {
                           </td>
                         </tr>
                       ))}
+                      {filteredRows.length === 0 && (
+                        <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">אין תוצאות לפילטר הנוכחי</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

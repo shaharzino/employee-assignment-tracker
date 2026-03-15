@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  ShieldCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/attendance', label: 'נוכחות', icon: ClipboardList },
   { href: '/employees', label: 'עובדים', icon: Users },
   { href: '/departments', label: 'מחלקות', icon: Building2 },
+  { href: '/users', label: 'משתמשים', icon: ShieldCheck },
   { href: '/reports/monthly', label: 'דוחות', icon: BarChart3 },
 ]
 
