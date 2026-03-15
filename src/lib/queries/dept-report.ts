@@ -50,10 +50,19 @@ export async function fetchDeptReport(
     home_dept: { name: string; color_hex: string } | null
   }>
 
+  // Pre-compute working day count per schedule variant (at most 2: sun_thu, sun_fri)
+  // Avoids calling countWorkingDaysInRange N times for N employees with the same schedule
+  const uniqueSchedules = [...new Set(allEmployees.map((e) => e.work_days))]
+  const workingDaysBySchedule = new Map<string, number>(
+    await Promise.all(
+      uniqueSchedules.map(async (wd) => [wd, await countWorkingDaysInRange(startDate, endDate, wd)] as const)
+    )
+  )
+
   const rows: DeptReportRow[] = []
 
   for (const emp of allEmployees) {
-    const totalWorkingDays = await countWorkingDaysInRange(startDate, endDate, emp.work_days)
+    const totalWorkingDays = workingDaysBySchedule.get(emp.work_days) ?? 0
     if (totalWorkingDays === 0) continue
 
     const empAssignments = allAssignments.filter((a) => a.employee_id === emp.id)

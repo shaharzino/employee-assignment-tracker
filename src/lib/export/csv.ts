@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { DeptBalance, CrossAssignmentRow } from '@/lib/queries/reports'
+import type { DeptReportRow } from '@/lib/queries/dept-report'
 import { DURATION_LABELS } from '@/types'
 import type { DurationType } from '@/types'
 
@@ -63,4 +64,27 @@ export function exportDailyReportCsv(
   }))
   const content = Papa.unparse(rows)
   downloadCsv(content, `דוח_יומי_${date}.csv`)
+}
+
+export function exportDeptReportCsv(
+  rows: DeptReportRow[],
+  deptName: string,
+  start: string,
+  end: string
+) {
+  const lines = [
+    `דוח מחלקתי - ${deptName}`,
+    `תקופה: ${start.split('-').reverse().join('/')} עד ${end.split('-').reverse().join('/')}`,
+    '',
+    Papa.unparse(rows.map((r) => ({
+      'שם עובד': r.employeeName,
+      'מ.עובד': r.employeeNumber ?? '',
+      'מחלקת בית': r.homeDeptName,
+      'סוג': r.isHome ? 'בית' : 'שאול',
+      'ימים במחלקה': r.daysInDept,
+      'ימי עבודה כלליים': r.totalWorkingDays,
+      'אחוז': `${r.percentage}%`,
+    }))),
+  ]
+  downloadCsv(lines.join('\n'), `דוח_מחלקתי_${deptName}_${start.slice(0, 7)}.csv`)
 }

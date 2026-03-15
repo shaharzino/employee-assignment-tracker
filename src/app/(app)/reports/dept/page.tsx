@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchDeptReport, type DeptReportRow } from '@/lib/queries/dept-report'
+import { exportDeptReportCsv } from '@/lib/export/csv'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,24 +49,6 @@ function getPeriodRange(period: string): { start: string; end: string } {
   return { start: `${y}-01-01`, end: `${y}-12-31` }
 }
 
-function exportCsv(rows: DeptReportRow[], deptName: string, start: string, end: string) {
-  const lines = [
-    `דוח מחלקתי - ${deptName}`,
-    `תקופה: ${start} עד ${end}`,
-    '',
-    'שם עובד,מ.עובד,מחלקת בית,סוג,ימים במחלקה,ימי עבודה כלליים,אחוז',
-    ...rows.map((r) =>
-      `${r.employeeName},${r.employeeNumber ?? ''},${r.homeDeptName},${r.isHome ? 'בית' : 'שאול'},${r.daysInDept},${r.totalWorkingDays},${r.percentage}%`
-    ),
-  ]
-  const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `dept-report-${deptName}-${start.slice(0, 7)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 export default function DeptReportPage() {
   const [departments, setDepartments] = useState<Department[]>([])
@@ -144,7 +127,7 @@ export default function DeptReportPage() {
             size="sm"
             className="gap-2"
             disabled={loading || rows.length === 0}
-            onClick={() => exportCsv(rows, selectedDeptObj?.name ?? '', start, end)}
+            onClick={() => exportDeptReportCsv(rows, selectedDeptObj?.name ?? '', start, end)}
           >
             <Download className="h-4 w-4" />
             CSV

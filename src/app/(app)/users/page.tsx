@@ -7,14 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { Plus, X, UserX, UserCheck, ShieldCheck } from 'lucide-react'
-
-type Manager = {
-  id: string
-  full_name: string
-  email: string
-  is_admin: boolean
-  is_active: boolean
-}
+import type { Manager } from '@/types'
 
 export default function UsersPage() {
   const [managers, setManagers] = useState<Manager[]>([])
@@ -25,10 +18,13 @@ export default function UsersPage() {
   const supabase = createClient()
 
   async function load() {
-    const { data, error } = await supabase.from('managers').select('*').order('full_name')
-    if (error) { toast.error('שגיאה בטעינה: ' + error.message); return }
-    setManagers(data ?? [])
-    setLoading(false)
+    try {
+      const { data, error } = await supabase.from('managers').select('*').order('full_name')
+      if (error) { toast.error('שגיאה בטעינה: ' + error.message); return }
+      setManagers(data ?? [])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -161,7 +157,10 @@ export default function UsersPage() {
 
       {/* Add Manager Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onKeyDown={(e) => e.key === 'Escape' && !saving && setShowModal(false)}
+        >
           <div className="bg-background rounded-xl border shadow-xl p-6 w-full max-w-md space-y-4 mx-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">הוסף מנהל חדש</h2>

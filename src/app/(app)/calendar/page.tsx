@@ -321,8 +321,8 @@ export default function CalendarPage() {
                             style={{ backgroundColor: colorHex }}
                           />
                         </PopoverTrigger>
-                        <PopoverContent className="w-44 p-2" side="bottom" align="center">
-                          <p className="text-xs text-muted-foreground font-medium mb-2 truncate">
+                        <PopoverContent className="w-64 p-2" side="bottom" align="center">
+                          <p className="text-xs text-muted-foreground font-medium mb-2">
                             {emp.full_name} — {day}/{month}
                           </p>
                           <div className="space-y-0.5">
@@ -335,11 +335,11 @@ export default function CalendarPage() {
                                 }`}
                               >
                                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color_hex }} />
-                                <span className="truncate">{d.name}</span>
+                                <span className="flex-1 text-start">{d.name}</span>
                                 {d.id === emp.home_dept_id && (
-                                  <span className="text-[10px] text-muted-foreground ms-auto">(בית)</span>
+                                  <span className="text-[10px] text-muted-foreground shrink-0">(בית)</span>
                                 )}
-                                {d.id === deptId && <Check className="h-3 w-3 ms-auto shrink-0" />}
+                                {d.id === deptId && <Check className="h-3 w-3 shrink-0" />}
                               </button>
                             ))}
                           </div>

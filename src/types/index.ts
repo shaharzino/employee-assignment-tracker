@@ -39,7 +39,15 @@ export type Manager = {
   full_name: string
   email: string
   is_admin: boolean
+  is_active: boolean
 }
+
+/** Shared colour palette used when auto-assigning colours to new departments */
+export const DEPT_COLOR_PALETTE = [
+  '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6',
+  '#EF4444', '#8B5CF6', '#14B8A6', '#F97316', '#06B6D4',
+  '#84CC16', '#A855F7', '#E11D48', '#0EA5E9', '#D97706',
+]
 
 export type DurationValue = 1.0 | 0.5
 

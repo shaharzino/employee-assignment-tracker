@@ -10,12 +10,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { Plus, Pencil, Power } from 'lucide-react'
-import type { Department } from '@/types'
+import { type Department, DEPT_COLOR_PALETTE } from '@/types'
 
-const PRESET_COLORS = [
-  '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444',
-  '#6B7280', '#EC4899', '#14B8A6', '#F97316', '#6366F1',
-]
+const PRESET_COLORS = DEPT_COLOR_PALETTE
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])

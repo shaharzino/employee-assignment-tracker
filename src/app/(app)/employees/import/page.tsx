@@ -7,12 +7,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Upload, FileSpreadsheet, ArrowRight, CheckCircle2 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-
-const DEPT_COLORS = [
-  '#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6',
-  '#EF4444', '#8B5CF6', '#14B8A6', '#F97316', '#06B6D4',
-  '#84CC16', '#A855F7', '#E11D48', '#0EA5E9', '#D97706',
-]
+import { DEPT_COLOR_PALETTE } from '@/types'
 
 type ParsedRow = {
   employeeNumber: string
@@ -86,7 +81,7 @@ export default function ImportEmployeesPage() {
         const colorOffset = existingDepts?.length ?? 0
         const newDepts = newDeptNames.map((name, i) => ({
           name,
-          color_hex: DEPT_COLORS[(colorOffset + i) % DEPT_COLORS.length],
+          color_hex: DEPT_COLOR_PALETTE[(colorOffset + i) % DEPT_COLOR_PALETTE.length],
           is_active: true,
         }))
         const { data: created, error: deptError } = await supabase

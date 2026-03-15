@@ -47,13 +47,24 @@ export default function EmployeesPage() {
 
   async function handleBulkDelete() {
     if (selectedIds.size === 0) return
-    if (!window.confirm(`האם למחוק ${selectedIds.size} עובדים? פעולה זו בלתי הפיכה.`)) return
+    if (!window.confirm(`האם למחוק ${selectedIds.size} עובדים? פעולה זו תמחק גם את כל השיוכים שלהם ובלתי הפיכה.`)) return
     setDeleting(true)
-    const { error } = await supabase.from('employees').delete().in('id', [...selectedIds])
-    if (error) {
-      toast.error('שגיאה במחיקה: ' + error.message)
+    const ids = [...selectedIds]
+    // Delete related assignments first (FK constraint)
+    const { error: assignError } = await supabase
+      .from('daily_assignments')
+      .delete()
+      .in('employee_id', ids)
+    if (assignError) {
+      toast.error('שגיאה במחיקת שיוכים: ' + assignError.message)
+      setDeleting(false)
+      return
+    }
+    const { error: empError } = await supabase.from('employees').delete().in('id', ids)
+    if (empError) {
+      toast.error('שגיאה במחיקת עובדים: ' + empError.message)
     } else {
-      const count = selectedIds.size
+      const count = ids.length
       setEmployees((prev) => prev.filter((e) => !selectedIds.has(e.id)))
       setSelectedIds(new Set())
       toast.success(`נמחקו ${count} עובדים בהצלחה`)
