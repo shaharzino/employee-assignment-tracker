@@ -1,0 +1,66 @@
+import Papa from 'papaparse'
+import { DeptBalance, CrossAssignmentRow } from '@/lib/queries/reports'
+import { DURATION_LABELS } from '@/types'
+import type { DurationType } from '@/types'
+
+const BOM = '\uFEFF'
+
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([BOM + content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function exportMonthlyReportCsv(
+  balances: DeptBalance[],
+  crossRows: CrossAssignmentRow[],
+  month: string // "2026-03"
+) {
+  const [year, mon] = month.split('-')
+  const monthName = new Date(Number(year), Number(mon) - 1, 1).toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })
+
+  // Section 1: balance table
+  const balanceRows = balances.map((b) => ({
+    'מחלקה': b.name,
+    'שאלה (ימי עובד)': b.borrowed,
+    'השאילה (ימי עובד)': b.lent,
+    'יתרה': b.net_balance,
+  }))
+
+  const section1 = Papa.unparse(balanceRows)
+
+  // Section 2: cross-assignment detail
+  const detailRows = crossRows.map((r) => ({
+    'שם עובד': r.employee_name,
+    'מספר עובד': r.employee_number ?? '',
+    'מחלקת בית': r.home_dept_name,
+    'עבד ב': r.worked_dept_name,
+    'תאריך': r.work_date.split('-').reverse().join('/'),
+    'משמרת': DURATION_LABELS[r.duration as DurationType] ?? r.duration,
+  }))
+
+  const section2 = Papa.unparse(detailRows)
+
+  const content = `דוח חודשי - ${monthName}\n\nסיכום לפי מחלקה\n${section1}\n\nפירוט שיוכים צולבים\n${section2}`
+  downloadCsv(content, `דוח_חודשי_${month}.csv`)
+}
+
+export function exportDailyReportCsv(
+  crossRows: CrossAssignmentRow[],
+  date: string
+) {
+  const formattedDate = date.split('-').reverse().join('/')
+  const rows = crossRows.map((r) => ({
+    'שם עובד': r.employee_name,
+    'מספר עובד': r.employee_number ?? '',
+    'מחלקת בית': r.home_dept_name,
+    'עבד ב': r.worked_dept_name,
+    'משמרת': DURATION_LABELS[r.duration as DurationType] ?? r.duration,
+  }))
+  const content = Papa.unparse(rows)
+  downloadCsv(content, `דוח_יומי_${date}.csv`)
+}
