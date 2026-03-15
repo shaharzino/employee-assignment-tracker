@@ -52,6 +52,8 @@ export default function QuarterlyReportPage() {
             <Link href="/reports/monthly" className="hover:text-foreground">חודשי</Link>
             <span>|</span>
             <span className="text-foreground font-medium">רבעוני</span>
+            <span>|</span>
+            <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
           </nav>
           <select
             value={year}

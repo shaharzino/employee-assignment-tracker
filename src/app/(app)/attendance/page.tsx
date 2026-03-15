@@ -38,6 +38,7 @@ export default function AttendancePage() {
     setEmployees((emps as unknown as Employee[]) ?? [])
     setDepartments(depts ?? [])
 
+    // Load only exception records from DB
     loadEntries(
       (assignments ?? []).map((a) => ({
         employeeId: a.employee_id,
@@ -61,26 +62,49 @@ export default function AttendancePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { toast.error('לא מחובר'); setSaving(false); return }
 
-    const upserts = dirty.map((e) => ({
-      ...(e.dbId ? { id: e.dbId } : {}),
-      work_date: e.workDate,
-      employee_id: e.employeeId,
-      dept_id: e.deptId,
-      duration: e.shift,
-      created_by: user.id,
-      updated_by: user.id,
-      updated_at: new Date().toISOString(),
-    }))
-
-    const { error } = await supabase.from('daily_assignments').upsert(upserts, {
-      onConflict: 'employee_id,work_date,duration',
+    // Separate exceptions (need upsert) from home-dept entries (need delete)
+    const toUpsert = dirty.filter((e) => {
+      const emp = employees.find((em) => em.id === e.employeeId)
+      return emp && e.deptId !== emp.home_dept_id
+    })
+    const toDelete = dirty.filter((e) => {
+      const emp = employees.find((em) => em.id === e.employeeId)
+      return emp && e.deptId === emp.home_dept_id && e.dbId
     })
 
-    if (error) { toast.error('שגיאה בשמירה: ' + error.message); setSaving(false); return }
+    try {
+      if (toUpsert.length > 0) {
+        const upserts = toUpsert.map((e) => ({
+          ...(e.dbId ? { id: e.dbId } : {}),
+          work_date: e.workDate,
+          employee_id: e.employeeId,
+          dept_id: e.deptId,
+          duration: e.shift,
+          created_by: user.id,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }))
+        const { error } = await supabase.from('daily_assignments').upsert(upserts, {
+          onConflict: 'employee_id,work_date,duration',
+        })
+        if (error) throw error
+      }
 
-    clearDirty()
-    toast.success(`נשמרו ${dirty.length} רשומות בהצלחה`)
-    setSaving(false)
+      // Delete records that returned to home dept
+      for (const e of toDelete) {
+        const { error } = await supabase.from('daily_assignments').delete().eq('id', e.dbId!)
+        if (error) throw error
+      }
+      const totalChanged = toUpsert.length + toDelete.length
+      clearDirty()
+      toast.success(`נשמרו ${totalChanged} שינויים בהצלחה`)
+      // Reload to get clean state
+      loadData(date)
+    } catch (err) {
+      toast.error('שגיאה בשמירה: ' + (err as Error).message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleCopyYesterday() {
@@ -90,20 +114,20 @@ export default function AttendancePage() {
       .select('*')
       .eq('work_date', yesterday)
 
-    if (!yesterdayAssignments?.length) { toast.warning('אין נתונים מאתמול'); return }
+    if (!yesterdayAssignments?.length) { toast.warning('אין שיוכים צולבים מאתמול'); return }
 
+    // Only copy exceptions (not home dept records)
     for (const a of yesterdayAssignments) {
       setEntry(a.employee_id, a.duration as DurationType, a.dept_id)
     }
-    toast.success(`הועתקו ${yesterdayAssignments.length} רשומות מ-${format(new Date(yesterday), 'd/M/yyyy')}`)
+    toast.success(`הועתקו ${yesterdayAssignments.length} שיוכים צולבים מ-${format(new Date(yesterday), 'd/M/yyyy')}`)
   }
 
+  // Count cross-assignments (exceptions) - both from DB and dirty entries
   const crossCount = Object.values(entries).flat().filter((e) => {
     const emp = employees.find((em) => em.id === e.employeeId)
     return emp && emp.home_dept_id !== e.deptId
   }).length
-
-  const loggedCount = new Set(Object.keys(entries)).size
 
   const filteredEmployees = activeTab === 'all'
     ? employees
@@ -139,13 +163,16 @@ export default function AttendancePage() {
 
       {/* Stats bar */}
       <div className="flex gap-4 text-sm text-muted-foreground">
-        <span>{loggedCount} מוקלדים מתוך {employees.length}</span>
+        <span>{employees.length} עובדים פעילים</span>
         {crossCount > 0 && (
           <span className="text-orange-600 font-medium flex items-center gap-1">
             <ArrowUpDown className="h-3 w-3" />
             {crossCount} שיוכים צולבים
           </span>
         )}
+        <span className="text-xs text-muted-foreground/60">
+          ברירת מחדל: כל עובד עובד במחלקת הבית
+        </span>
       </div>
 
       {/* Department tabs */}
@@ -218,7 +245,6 @@ function AttendanceRow({
   onSetEntry: (shift: DurationType, deptId: string) => void
   onRemoveEntry: (shift: DurationType) => void
 }) {
-  // For a full-day shift, show one row. For half-days show two rows.
   const fullEntry = entries.find((e) => e.shift === 'full')
   const morningEntry = entries.find((e) => e.shift === 'half_morning')
   const afternoonEntry = entries.find((e) => e.shift === 'half_afternoon')
@@ -226,31 +252,37 @@ function AttendanceRow({
   const homeDeptId = employee.home_dept_id ?? ''
   const homeDept = departments.find((d) => d.id === homeDeptId)
 
+  // In "changes only" mode: no entry = full day at home dept (default)
+  // An entry only exists if it's an exception
+  const hasException = entries.length > 0
+  const currentShiftMode = fullEntry ? 'full' : (morningEntry || afternoonEntry) ? 'half' : 'full' // default to 'full'
+
   function isCross(deptId: string) {
     return deptId && deptId !== homeDeptId
   }
 
   function handleShiftSelect(shift: DurationType | typeof NO_WORK) {
     if (shift === NO_WORK) {
-      // Remove all entries for this employee
       SHIFTS.forEach((s) => onRemoveEntry(s))
       return
     }
-    // When switching to full: remove half entries; when switching to half: remove full
     if (shift === 'full') {
       onRemoveEntry('half_morning')
       onRemoveEntry('half_afternoon')
-      onSetEntry('full', homeDeptId)
+      // If returning to full day at home dept, remove the entry (back to default)
+      if (!hasException || (fullEntry && fullEntry.deptId === homeDeptId)) {
+        onRemoveEntry('full')
+      } else {
+        onSetEntry('full', homeDeptId)
+      }
     } else {
       onRemoveEntry('full')
       onSetEntry(shift, homeDeptId)
     }
   }
 
-  const currentShiftMode = fullEntry ? 'full' : (morningEntry || afternoonEntry) ? 'half' : NO_WORK
-
-  const rowClass = (deptId: string) =>
-    isCross(deptId) ? 'border-r-4 border-orange-400 bg-orange-50/50' : ''
+  // Current department for the full day: use exception if exists, otherwise home dept
+  const currentFullDeptId = fullEntry ? fullEntry.deptId : homeDeptId
 
   return (
     <>
@@ -266,7 +298,7 @@ function AttendanceRow({
         </td>
         <td className="px-4 py-2">
           <Select
-            value={currentShiftMode === 'full' ? 'full' : currentShiftMode === 'half' ? 'half' : NO_WORK}
+            value={currentShiftMode === 'half' ? 'half' : 'full'}
             onValueChange={(v) => {
               if (v === 'half') {
                 onRemoveEntry('full')
@@ -279,30 +311,39 @@ function AttendanceRow({
           >
             <SelectTrigger className="w-28 h-8">
               <SelectValue>
-                {currentShiftMode === 'full' ? 'יום מלא' : currentShiftMode === 'half' ? 'חצי יום' : 'לא עבד'}
+                {currentShiftMode === 'half' ? 'חצי יום' : 'יום מלא'}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={NO_WORK}>לא עבד</SelectItem>
               <SelectItem value="full">יום מלא</SelectItem>
               <SelectItem value="half">חצי יום</SelectItem>
             </SelectContent>
           </Select>
         </td>
         <td className="px-4 py-2">
-          {fullEntry ? (
+          {currentShiftMode !== 'half' ? (
             <div className="flex items-center gap-2">
               <DeptSelect
-                value={fullEntry.deptId}
+                value={currentFullDeptId}
                 departments={departments}
-                onChange={(deptId) => onSetEntry('full', deptId)}
+                onChange={(deptId) => {
+                  if (deptId === homeDeptId) {
+                    // Returning to home dept → remove exception (delete record on save)
+                    if (fullEntry?.dbId) {
+                      // Mark as dirty with home dept so save knows to delete
+                      onSetEntry('full', homeDeptId)
+                    } else {
+                      onRemoveEntry('full')
+                    }
+                  } else {
+                    onSetEntry('full', deptId)
+                  }
+                }}
               />
-              {isCross(fullEntry.deptId) && <span className="text-orange-500 text-xs">↗</span>}
+              {isCross(currentFullDeptId) && <span className="text-orange-500 text-xs">↗</span>}
             </div>
-          ) : currentShiftMode === 'half' ? (
-            <span className="text-xs text-muted-foreground">ראה שורות למטה</span>
           ) : (
-            <span className="text-xs text-muted-foreground">—</span>
+            <span className="text-xs text-muted-foreground">ראה שורות למטה</span>
           )}
         </td>
       </tr>
@@ -314,7 +355,7 @@ function AttendanceRow({
             const entry = entries.find((e) => e.shift === shift)
             const deptId = entry?.deptId ?? homeDeptId
             return (
-              <tr key={shift} className={`border-b bg-muted/20 ${isCross(deptId) ? rowClass(deptId) : ''}`}>
+              <tr key={shift} className={`border-b bg-muted/20 ${isCross(deptId) ? 'border-r-4 border-orange-400 bg-orange-50/50' : ''}`}>
                 <td className="px-4 py-1" />
                 <td className="px-4 py-1 text-xs text-muted-foreground ps-8">↳ {DURATION_LABELS[shift]}</td>
                 <td className="px-4 py-1" />
@@ -324,7 +365,17 @@ function AttendanceRow({
                     <DeptSelect
                       value={deptId}
                       departments={departments}
-                      onChange={(d) => onSetEntry(shift, d)}
+                      onChange={(d) => {
+                        if (d === homeDeptId) {
+                          if (entry?.dbId) {
+                            onSetEntry(shift, homeDeptId)
+                          } else {
+                            onRemoveEntry(shift)
+                          }
+                        } else {
+                          onSetEntry(shift, d)
+                        }
+                      }}
                     />
                     {isCross(deptId) && <span className="text-orange-500 text-xs">↗</span>}
                   </div>

@@ -44,6 +44,8 @@ export default function DailyReportPage() {
             <Link href="/reports/monthly" className="hover:text-foreground">חודשי</Link>
             <span>|</span>
             <Link href="/reports/quarterly" className="hover:text-foreground">רבעוני</Link>
+            <span>|</span>
+            <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
           </nav>
           <input
             type="date"

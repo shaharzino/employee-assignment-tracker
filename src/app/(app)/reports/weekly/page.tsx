@@ -49,6 +49,8 @@ export default function WeeklyReportPage() {
             <Link href="/reports/monthly" className="hover:text-foreground">חודשי</Link>
             <span>|</span>
             <Link href="/reports/quarterly" className="hover:text-foreground">רבעוני</Link>
+            <span>|</span>
+            <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
           </nav>
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" onClick={() => setWeekStart(subWeeks(weekStart, 1))}>

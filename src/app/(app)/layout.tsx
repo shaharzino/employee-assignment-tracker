@@ -11,6 +11,7 @@ import {
   Users,
   Building2,
   BarChart3,
+  CalendarDays,
   LogOut,
   Menu,
   X,
@@ -20,6 +21,7 @@ import { toast } from 'sonner'
 
 const navItems = [
   { href: '/dashboard', label: 'לוח בקרה', icon: LayoutDashboard },
+  { href: '/calendar', label: 'לוח שנה', icon: CalendarDays },
   { href: '/attendance', label: 'נוכחות', icon: ClipboardList },
   { href: '/employees', label: 'עובדים', icon: Users },
   { href: '/departments', label: 'מחלקות', icon: Building2 },

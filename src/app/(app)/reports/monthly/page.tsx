@@ -55,6 +55,8 @@ export default function MonthlyReportPage() {
             <span className="text-foreground font-medium">חודשי</span>
             <span>|</span>
             <Link href="/reports/quarterly" className="hover:text-foreground">רבעוני</Link>
+            <span>|</span>
+            <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
           </nav>
           <input
             type="month"
