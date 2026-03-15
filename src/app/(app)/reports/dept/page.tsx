@@ -102,6 +102,8 @@ export default function DeptReportPage() {
             <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
             <span>|</span>
             <span className="text-foreground font-medium">מחלקתי</span>
+            <span>|</span>
+            <Link href="/reports/employee" className="hover:text-foreground">עובד</Link>
           </nav>
 
           <select

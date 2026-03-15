@@ -59,6 +59,8 @@ export default function DailyReportPage() {
             <Link href="/reports/allocations" className="hover:text-foreground">הקצאות</Link>
             <span>|</span>
             <Link href="/reports/dept" className="hover:text-foreground">מחלקתי</Link>
+            <span>|</span>
+            <Link href="/reports/employee" className="hover:text-foreground">עובד</Link>
           </nav>
           <input
             type="date"
